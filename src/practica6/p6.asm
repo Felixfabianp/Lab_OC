@@ -1,57 +1,154 @@
-%include "../../lib/pc_io.inc"   ; incluir declaraciones de procedimiento externos
+%include "../../lib/pc_io.inc"
 
 section .data
     bskey equ 0x7F
     lencadena equ 255
     ln equ 0x0A
-    nline db ln,0
-    msg1 db ln,'Captura: ', 0
-    msg2 db ln,'Cadena: ', 0
-    
+    msg_prompt db 'Ingresa cadena: ', 0
+    msg_minus db ln,'Minusculas: ', 0
+    msg_mayus db ln,'Mayusculas: ', 0
+
 section .bss
     cadena resb lencadena
 
 section .text
-    global _start         ; referencia para inicio de programa
-    
-_start:   
-   
-    ; --- IMPRIMIR CADENA  ---
-    mov edx, msg1        
-    call puts   
-    call captura    
-    call captura        
-    jmp .fin_programa  
-    
-    
-    
-    ; --- FIN DE PROGRAMA ---
-    .fin_programa: 
-        mov edx, nline    
-        call puts     
-        call puts     
-        mov eax, 1            ; Llamada sys_exit
-	    xor ebx, ebx          ; return 0
-        int 0x80              ; Fin de programa
+    global _start
 
-   
-    captura:
-            push ax
-            call getch
-            cmp al, bskey
-            jne .sig
-            call borrar
-    .sig:   call putchar
-            pop ax
-            ret
+_start:
+    mov edx, msg_prompt
+    call puts
 
-    borrar:
-        push ax 
-        mov al,0x8
-        call putchar    
-        mov al,' '
-        call putchar
-        mov al,0x8
-        call putchar   
-        pop ax
-        ret 
+    mov ax, lencadena
+    mov edx, cadena
+    call captura
+
+    mov edx, msg_minus
+    call puts
+    mov edx, cadena
+    call minusculas
+    call puts
+
+    mov edx, msg_mayus
+    call puts
+    mov edx, cadena
+    call mayusculas
+    call puts
+
+    mov al, ln
+    call putchar
+
+.fin_programa:
+    mov eax, 1
+    xor ebx, ebx
+    int 0x80
+
+captura:
+    push eax
+    push ebx
+    push edx
+    push esi
+
+    movzx ebx, ax
+    dec ebx
+    mov esi, edx
+
+.ciclo:
+    call getch
+
+    cmp al, ln
+    je .fin
+
+    cmp al, 0x0D
+    je .fin
+
+    cmp al, bskey
+    je .retroceso
+
+    cmp al, 0x08
+    je .retroceso
+
+    cmp ebx, 0
+    je .ciclo
+
+    mov [esi], al
+    inc esi
+    dec ebx
+    call putchar
+    jmp .ciclo
+
+.retroceso:
+    cmp esi, edx
+    je .ciclo
+
+    dec esi
+    inc ebx
+    call borrar
+    jmp .ciclo
+
+.fin:
+    mov byte [esi], 0
+
+    pop esi
+    pop edx
+    pop ebx
+    pop eax
+    ret
+
+borrar:
+    push eax
+    mov al, 0x08
+    call putchar
+    mov al, ' '
+    call putchar
+    mov al, 0x08
+    call putchar
+    pop eax
+    ret
+
+mayusculas:
+    push eax
+    push edx
+
+.ciclo:
+    mov al, [edx]
+    cmp al, 0
+    je .salir
+    cmp al, 'a'
+    jb .siguiente
+    cmp al, 'z'
+    ja .siguiente
+    sub al, 32
+    mov [edx], al
+
+.siguiente:
+    inc edx
+    jmp .ciclo
+
+.salir:
+    pop edx
+    pop eax
+    ret
+
+minusculas:
+    push eax
+    push edx
+
+.ciclo:
+    mov al, [edx]
+    cmp al, 0
+    je .salir
+    cmp al, 'A'
+    jb .siguiente
+    cmp al, 'Z'
+    ja .siguiente
+    add al, 32
+    mov [edx], al
+
+.siguiente:
+    inc edx
+    jmp .ciclo
+
+.salir:
+    pop edx
+    pop eax
+    ret
