@@ -1,140 +1,196 @@
-%macro FOR 4
 
-.%4_start:
-	cmp %1, %2
-	jge .%4_end
-	%endmacro
+%include "../../lib/pc_io.inc"
 
-	%macro END_FOR 4
-	add    %1, %3
-	jmp    .%4_start
+section .data
+    msg_input db "Ingrese la cadena numerica: ", 0
+    msg_atoi  db "atoi -> ", 0
+    msg_itoa  db "itoa -> ", 0
 
-.%4_end:
-	%endmacro
+section .bss
+    string    resb 64
+    resultado resb 64
+    numero    resd 1
 
-	%include "../../lib/pc_io.inc"
-	extern   _itoa
-	extern   _atoi
-	extern   capturar
-
-	section .data
-	msg_menu_title      db "Seleccione una opcion:", 0xA, 0
-	msg_menu_opt_atoi   db "1) atoi", 0xA, 0
-	msg_menu_opt_itoa   db "2) itoa", 0xA, 0
-	msg_menu_opt_exit   db "3) salir", 0xA, 0
-	msg_menu_input      db "--> ", 0
-	msg_menu_input_error db "Opcion no valida, intente de nuevo", 0xA, 0
-	msg_input_str       db "Ingrese la cadena: ", 0
-	msg_input_num       db "Ingrese el numero: ", 0
-	msg_res_atoi        db "atoi -> ", 0
-	msg_res_itoa        db "itoa -> ", 0
-
-	section .bss
-	option  resd 1
-	string  resb 32
-
-	section .text
-	global  _start
+section .text
+    global _start
 
 _start:
+    mov edx, msg_input
+    call puts
 
-.menu_while_start:
-	mov  edx, msg_menu_title
-	call puts
-	mov  edx, msg_menu_opt_atoi
-	call puts
-	mov  edx, msg_menu_opt_itoa
-	call puts
-	mov  edx, msg_menu_opt_exit
-	call puts
-	mov  edx, msg_menu_input
-	call puts
+    mov edi, string
+    mov ecx, 63
 
-	call getch         ; getch no hace eco; lo hacemos manual para controlar el formato
-	mov  [option], eax
-	call putchar       ; eco del caracter elegido
-	mov  al, 0xa
-	call putchar       ; newline manual porque getch no lo agrega
+capturar:
+    push ecx
+    push edi
+    call getch
+    pop edi
+    pop ecx
 
-	mov eax, [option]
-	cmp al, '1'
-	je  .opt_atoi
-	cmp al, '2'
-	je  .opt_itoa
-	cmp al, '3'
-	je  .opt_exit
-	jmp .opt_error
+    cmp al, 13
+    je fin_captura
+    cmp al, 10
+    je fin_captura
 
-.opt_atoi:
-	mov  edx, msg_input_str
-	call puts
+    cmp al, 8
+    je capturar
 
-	mov  ax, 32
-	mov  edx, string
-	call capturar
+    push eax
+    push ecx
+    push edi
+    call putchar
+    pop edi
+    pop ecx
+    pop eax
 
-	mov  edx, msg_res_atoi
-	call puts
+    mov [edi], al
+    inc edi
+    dec ecx
 
-	push dword 32      ; limite de lectura igual al tamano del buffer para evitar leer basura fuera
-	push string
-	call _atoi
-	add  esp, 8
+    cmp ecx, 0
+    je fin_captura
 
-	; reutilizamos el mismo buffer: atoi ya termino de leer, itoa puede sobreescribirlo
-	push string
-	push eax
-	call _itoa
-	add  esp, 8
+    jmp capturar
 
-	mov  edx, string
-	call puts
-	add  esp, 8
+fin_captura:
+    mov byte [edi], 0
 
-	mov  al, 10
-	call putchar       ; newline de separacion antes de volver al menu
+    mov al, 10
+    call putchar
 
-	jmp .menu_while_start
+    mov edx, string
+    call atoi
+    mov [numero], eax
 
-.opt_itoa:
-	mov  edx, msg_input_num
-	call puts
+    mov edx, msg_atoi
+    call puts
 
-	mov  ax, 32
-	mov  edx, string
-	call capturar
+    mov eax, [numero]
+    mov edx, resultado
+    mov ecx, 64
+    call itoa
 
-	mov  edx, msg_res_itoa
-	call puts
+    mov edx, resultado
+    call puts
 
-	; opt_itoa tambien pasa por atoi primero para normalizar la entrada del usuario
-	push dword 32
-	push string
-	call _atoi
-	add  esp, 8
+    mov al, 10
+    call putchar
 
-	push string
-	push eax
-	call _itoa
-	add  esp, 8
+    mov edx, msg_itoa
+    call puts
 
-	mov  edx, string
-	call puts
+    mov edx, resultado
+    call puts
 
-	mov  al, 10
-	call putchar
+    mov al, 10
+    call putchar
 
-	jmp .menu_while_start
+    mov eax, 1
+    mov ebx, 0
+    int 0x80
 
-.opt_exit:
-	jmp .menu_while_exit
+atoi:
+    mov esi, edx
+    xor eax, eax
+    mov ebx, 1
 
-.opt_error:
-	mov  edx, msg_menu_input_error
-	call puts
-	jmp  .menu_while_start
+espacios:
+    cmp byte [esi], ' '
+    je siguiente
+    cmp byte [esi], 9
+    jne signo
 
-.menu_while_exit:
-	mov eax, 1
-	mov ebx, 0
-	int 0x80
+siguiente:
+    inc esi
+    jmp espacios
+
+signo:
+    cmp byte [esi], '-'
+    jne positivo
+    mov ebx, -1
+    inc esi
+    jmp convertir
+
+positivo:
+    cmp byte [esi], '+'
+    jne convertir
+    inc esi
+
+convertir:
+    movzx ecx, byte [esi]
+    cmp ecx, '0'
+    jl fin_atoi
+    cmp ecx, '9'
+    jg fin_atoi
+
+    sub ecx, '0'
+    imul eax, eax, 10
+    add eax, ecx
+
+    inc esi
+    jmp convertir
+
+fin_atoi:
+    imul eax, ebx
+    ret
+
+itoa:
+    mov edi, edx
+    mov esi, edx
+    mov ebx, 10
+
+    cmp ecx, 2
+    jb fin_itoa
+
+    cmp eax, 0
+    jge convertir_numero
+
+    mov byte [edi], '-'
+    inc edi
+    dec ecx
+
+convertir_numero:
+    mov esi, edi
+    mov ebp, ecx
+    dec ebp
+
+dividir:
+    cdq
+    idiv ebx
+
+    cmp edx, 0
+    jge digito
+    neg edx
+
+digito:
+    add dl, '0'
+    mov [edi], dl
+    inc edi
+    dec ebp
+
+    cmp eax, 0
+    je invertir
+    cmp ebp, 0
+    jne dividir
+
+invertir:
+    mov byte [edi], 0
+    dec edi
+
+cambiar:
+    cmp esi, edi
+    jae fin_itoa
+
+    mov al, [esi]
+    mov ah, [edi]
+    mov [esi], ah
+    mov [edi], al
+
+    inc esi
+    dec edi
+    jmp cambiar
+
+fin_itoa:
+    mov eax, edx
+    ret
