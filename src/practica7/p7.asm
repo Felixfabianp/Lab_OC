@@ -2,7 +2,7 @@
 %include "../../lib/pc_io.inc"
 
 section .data
-    msg_input db "Ingrese la cadena numerica: ", 0
+    msg_input db "Captura una cadena numerica: ", 0
     msg_atoi  db "atoi -> ", 0
     msg_itoa  db "itoa -> ", 0
 
@@ -69,6 +69,7 @@ fin_captura:
     mov eax, [numero]
     mov edx, resultado
     mov ecx, 64
+    add eax, 35
     call itoa
 
     mov edx, resultado
