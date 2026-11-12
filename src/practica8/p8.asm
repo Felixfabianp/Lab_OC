@@ -2,9 +2,9 @@ extern canonical_off
 extern canonical_on
 
 section .data
-    bskey equ 0x7F
+    bskey equ 127
     lencadena equ 255
-    ln equ 0x0A
+    ln equ 10
 
     msg_prompt db 'Ingresa cadena: ', 0
     msg_minus db ln, 'Minusculas: ', 0
